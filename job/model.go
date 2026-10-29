@@ -11,7 +11,7 @@ type Job struct {
 	Kind      string          `json:"kind"`
 	Args      json.RawMessage `json:"args"`
 
-	State       JobState   `json:"state"`
+	State       JobState   `json:"state"` 
 	AvailableAt *time.Time `json:"available_at,omitempty"`
 
 	Attempt     int32      `json:"attempt"`
