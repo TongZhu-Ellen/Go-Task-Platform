@@ -30,3 +30,8 @@ func (s *Service) createJob(ctx context.Context, reqp *CreateJobRequest) (*Job, 
 
 	return jobp, nil
 }
+
+
+func (s *Service) Claim(ctx context.Context) (*Job, error) {
+    return s.repository.claim(ctx)
+}
