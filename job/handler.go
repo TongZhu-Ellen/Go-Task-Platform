@@ -16,7 +16,7 @@ func NewHandler(service *Service) *Handler {
 	}
 }
 
-func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	reqp := &CreateJobRequest{}
 
 	// 1. 解析 JSON request body
@@ -26,7 +26,7 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 下一步：调用 Service 创建 job
-	jobp, err := h.service.createJob(r.Context(), reqp)
+	jobp, err := h.service.create(r.Context(), reqp)
 	if err != nil {
 		http.Error(w, "failed to create job", http.StatusInternalServerError)
 		return

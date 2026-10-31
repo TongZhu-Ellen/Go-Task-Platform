@@ -15,13 +15,16 @@ func NewService(repository *Repository) *Service {
 	}
 }
 
-func (s *Service) createJob(ctx context.Context, reqp *CreateJobRequest) (*Job, error) {
+func (s *Service) create(ctx context.Context, reqp *CreateJobRequest) (*Job, error) {
+
+	now := time.Now()
 	jobp := &Job{
-		CreatedAt: time.Now(),
-		Kind:      reqp.Kind,
-		Args:      reqp.Args,
-		State:     JobAvailable,
-		Attempt:   0,
+		CreatedAt:   now,
+		Kind:        reqp.Kind,
+		Args:        reqp.Args,
+		State:       JobAvailable,
+		AvailableAt: &now,
+		Attempt:     0,
 	}
 
 	if err := s.repository.create(ctx, jobp); err != nil {
@@ -31,7 +34,6 @@ func (s *Service) createJob(ctx context.Context, reqp *CreateJobRequest) (*Job, 
 	return jobp, nil
 }
 
-
-func (s *Service) Claim(ctx context.Context) (*Job, error) {
-    return s.repository.claim(ctx)
+func (s *Service) Claim(ctx context.Context, queueID int32) (*Job, error) {
+	return s.repository.claim(ctx, queueID)
 }

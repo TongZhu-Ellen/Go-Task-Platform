@@ -3,22 +3,21 @@ package main
 import (
 	"fmt"
 	"log"
-	
+
 	"net/http"
 
-    "go-task-platform/database"
-    "go-task-platform/job"
-
-
+	"go-task-platform/database"
+	"go-task-platform/job"
 )
 
 const databaseURL = "postgres://ellenchung@127.0.0.1:5432/go_task_platform?sslmode=disable"
+const workerAmount = 10
 
 func main() {
 	db, sqlDB, err := database.NewDB(databaseURL)
 	if err != nil {
 		log.Fatalf("failed to initialize database: %v", err)
-		
+
 	}
 
 	defer sqlDB.Close()
@@ -30,8 +29,9 @@ func main() {
 	handler := job.NewHandler(service)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /jobs", handler.CreateJob)
+	mux.HandleFunc("POST /jobs", handler.Create)
 
 	fmt.Println("server listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
+
 }
