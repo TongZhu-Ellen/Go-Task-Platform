@@ -18,8 +18,13 @@ func NewService(repository *Repository) *Service {
 func (s *Service) create(ctx context.Context, reqp *CreateJobRequest) (*Job, error) {
 
 	now := time.Now()
+	queue := reqp.Queue
+	if queue == "" {
+		queue = "default"
+	}
 	jobp := &Job{
 		CreatedAt:   now,
+		Queue:       queue,
 		Kind:        reqp.Kind,
 		Args:        reqp.Args,
 		State:       JobAvailable,
@@ -34,6 +39,9 @@ func (s *Service) create(ctx context.Context, reqp *CreateJobRequest) (*Job, err
 	return jobp, nil
 }
 
-func (s *Service) Claim(ctx context.Context, queueID int32) (*Job, error) {
-	return s.repository.claim(ctx, queueID)
+
+
+
+func (s *Service) Claim(ctx context.Context, queue string) (*Job, error) {
+	return s.repository.claim(ctx, queue)
 }

@@ -1,7 +1,8 @@
 
 CREATE TABLE jobs (
     id BIGINT    GENERATED ALWAYS AS IDENTITY     PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL,
+    queue TEXT NOT NULL DEFAULT 'default',
+    queue TEXT,
     kind TEXT NOT NULL,
     args JSONB, -- 这里为了方便测试等原因暂时允许留空！
     

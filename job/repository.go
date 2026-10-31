@@ -18,35 +18,20 @@ func NewRepository(db *gorm.DB) *Repository {
 
 func (r *Repository) create(ctx context.Context, jobp *Job) error {
 
-	var queueID int32
-
-	result := r.db.WithContext(ctx).
-		Table("queue_kinds").
-		Select("queue_id").
-		Where("kind = ?", jobp.Kind).
-		Scan(&queueID)
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		queueID = 1
-	}
-
-	jobp.QueueID = queueID
+	
 
 	return r.db.WithContext(ctx).Create(jobp).Error
 }
 
-func (r *Repository) claim(ctx context.Context, queueID int32) (*Job, error) {
+
+func (r *Repository) claim(ctx context.Context, queue string) (*Job, error) {
 	query := `
 		WITH claimed_job AS (
 			SELECT id
 			FROM jobs
 			WHERE state = 'available'
 			  AND available_at <= NOW()
-			  AND queue_id = ?
+			  AND queue = ?
 			ORDER BY available_at ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
@@ -61,15 +46,15 @@ func (r *Repository) claim(ctx context.Context, queueID int32) (*Job, error) {
 	`
 
 	jobp := &Job{}
-	result := r.db.WithContext(ctx).Raw(query, queueID).Scan(jobp)
+	result := r.db.WithContext(ctx).Raw(query, queue).Scan(jobp)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
-
 	if result.RowsAffected == 0 {
 		return nil, nil
 	}
-
 	return jobp, nil
 }
+
+

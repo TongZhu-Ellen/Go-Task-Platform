@@ -11,7 +11,7 @@ type Job struct {
 	Kind      string          `json:"kind"`
 	Args      json.RawMessage `json:"args"`
 
-	QueueID     int32      `json:"queue_id"`
+	Queue       string     `json:"queue"`
 	State       JobState   `json:"state"`
 	AvailableAt *time.Time `json:"available_at,omitempty"`
 
@@ -33,4 +33,5 @@ const (
 type CreateJobRequest struct {
 	Kind string          `json:"kind"`
 	Args json.RawMessage `json:"args"`
+	Queue string         `json:"queue"`
 }
