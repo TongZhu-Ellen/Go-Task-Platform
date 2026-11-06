@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -18,21 +19,27 @@ func NewRepository(db *gorm.DB) *Repository {
 
 func (r *Repository) create(ctx context.Context, jobp *Job) error {
 
-	
-
 	return r.db.WithContext(ctx).Create(jobp).Error
 }
 
-
-func (r *Repository) claim(ctx context.Context, queue string) (*Job, error) {
+func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 	query := `
 		WITH claimed_job AS (
 			SELECT id
 			FROM jobs
-			WHERE state = 'available'
-			  AND available_at <= NOW()
-			  AND queue = ?
-			ORDER BY available_at ASC
+			WHERE queue = ?
+			AND (
+				state = 'available'
+				OR (
+					state = 'retryable'
+					AND available_at <= NOW()
+				)
+			)
+			ORDER BY
+				CASE
+					WHEN state = 'available' THEN created_at
+					ELSE available_at
+				END ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		)
@@ -41,9 +48,11 @@ func (r *Repository) claim(ctx context.Context, queue string) (*Job, error) {
 			state = 'running',
 			attempt = attempt + 1,
 			last_attempt = NOW()
-		WHERE id = (SELECT id FROM claimed_job)
+		WHERE id = (SELECT id FROM claimed_job) -- 这里用 = 不用 IN 因为【一个】！
 		RETURNING *
 	`
+	// 区分 available 和 retryable，是为了明确表达 Job 的生命周期。
+	// 虽然合并为单一 available 状态可以简化 Claim SQL，但我们没有这样做。
 
 	jobp := &Job{}
 	result := r.db.WithContext(ctx).Raw(query, queue).Scan(jobp)
@@ -57,4 +66,28 @@ func (r *Repository) claim(ctx context.Context, queue string) (*Job, error) {
 	return jobp, nil
 }
 
+func (r *Repository) Complete(ctx context.Context, id int64) error {
+	return r.db.WithContext(ctx).
+		Model(&Job{}). // Table("jobs")
+		Where("id = ?", id).
+		Update("state", JobCompleted).
+		Error
+}
 
+func (r *Repository) Retry(ctx context.Context, id int64, availableAt time.Time) error {
+	return r.db.WithContext(ctx).
+		Model(&Job{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"state":        JobRetryable,
+			"available_at": availableAt,
+		}).Error
+}
+
+func (r *Repository) Discard(ctx context.Context, id int64) error {
+	return r.db.WithContext(ctx).
+		Model(&Job{}).
+		Where("id = ?", id).
+		Update("state", JobDiscarded).
+		Error
+}

@@ -10,11 +10,8 @@ import (
 	"go-task-platform/job"
 )
 
-const databaseURL = "postgres://ellenchung@127.0.0.1:5432/go_task_platform?sslmode=disable"
-const workerAmount = 10
-
 func main() {
-	db, sqlDB, err := database.NewDB(databaseURL)
+	db, sqlDB, err := database.NewDB(DatabaseURL)
 	if err != nil {
 		log.Fatalf("failed to initialize database: %v", err)
 

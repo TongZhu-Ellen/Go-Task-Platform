@@ -17,18 +17,18 @@ func NewService(repository *Repository) *Service {
 
 func (s *Service) create(ctx context.Context, reqp *CreateJobRequest) (*Job, error) {
 
-	now := time.Now()
 	queue := reqp.Queue
 	if queue == "" {
 		queue = "default"
 	}
+
+	
 	jobp := &Job{
-		CreatedAt:   now,
+		CreatedAt:   time.Now(),
 		Queue:       queue,
 		Kind:        reqp.Kind,
 		Args:        reqp.Args,
 		State:       JobAvailable,
-		AvailableAt: &now,
 		Attempt:     0,
 	}
 

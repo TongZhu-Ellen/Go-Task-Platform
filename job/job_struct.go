@@ -25,8 +25,8 @@ type JobState string
 const (
 	JobAvailable JobState = "available"
 	JobRunning   JobState = "running"
-	JobRetryable JobState = "retryable"
 	JobCompleted JobState = "completed"
+	JobRetryable JobState = "retryable"
 	JobDiscarded JobState = "discarded"
 )
 
