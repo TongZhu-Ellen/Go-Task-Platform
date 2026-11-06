@@ -59,7 +59,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 		// find	executor!
 		executor, ok := w.executors[job.Kind]
 		if !ok {
-			err := fmt.Errorf("executor 404 %q", job.Kind)
+			err := fmt.Errorf("executor %q not found!", job.Kind)
 			failToExecuteJob(job.ID, job.Kind, err)
 
 			if markErr := w.repo.MarkDiscarded(ctx, job.ID, err); markErr != nil {

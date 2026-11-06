@@ -63,7 +63,8 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 	if result.RowsAffected == 0 {
 		return nil, nil
 	}
-	return jobp, nil
+	
+	return jobp, result.Error
 }
 
 func (r *Repository) MarkComplete(ctx context.Context, id int64) error {
