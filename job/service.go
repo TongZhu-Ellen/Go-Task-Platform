@@ -42,6 +42,3 @@ func (s *Service) create(ctx context.Context, reqp *CreateJobRequest) (*Job, err
 
 
 
-func (s *Service) Claim(ctx context.Context, queue string) (*Job, error) {
-	return s.repository.claim(ctx, queue)
-}

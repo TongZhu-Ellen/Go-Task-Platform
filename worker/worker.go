@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"fmt"
+	"time"
+	"log"
 
 	"go-task-platform/job"
 )
@@ -45,11 +47,11 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 		job, err := w.repo.Claim(ctx, queue)
 		if err != nil {
 			log.Printf("worker: failed to claim job from queue %q: %v", queue, err)
-			time.Sleep(pollInterval)
+			time.Sleep(PollInterval)
 			continue
 		} 
 		if job == nil {
-			time.Sleep(pollInterval)
+			time.Sleep(PollInterval)
 			continue
 		}
 
@@ -107,7 +109,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 
 
 
-func failToMarkJobAs(action string, job *Job, err error) {
+func failToMarkJobAs(action string, job *job.Job, err error) {
 	log.Printf("worker: failed to mark job as %s (job_id=%d, kind=%q): %v",
 		action, job.ID, job.Kind, err)
 }
