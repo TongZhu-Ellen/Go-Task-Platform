@@ -41,6 +41,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 
         
 		
+		// claim job!
 		job, err := w.repo.Claim(ctx, queue)
 		if err != nil {
 			log.Printf("worker: failed to claim job from queue %q: %v", queue, err)
@@ -52,31 +53,68 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 			continue
 		}
 
-		var 
-
+		
+		// find	executor!
 		executor, ok := w.executors[job.Kind]
 		if !ok {
-			log.Printf("worker: no executor registered for job kind %q (job_id=%d)", job.Kind, job.ID)
-			if err := w.repo.Discard(ctx, job.ID); err != nil {
-				log.Printf("worker: failed to mark job as discarded (job_id=%d): %v", job.ID, err)
+			err := fmt.Errorf("executor 404 %q", job.Kind)
+			failToExecuteJob(job.ID, job.Kind, err)
+
+			if markErr := w.repo.MarkDiscarded(ctx, job.ID, err); markErr != nil {
+				failToMarkJobAs("discarded", job, markErr)
 			}
 			continue
 		}
 
+
+		// execute job! 
 		err = executor(ctx, job)
 		if err != nil {
-			log.Printf("worker: job execution failed (job_id=%d, kind=%q): %v", job.ID, job.Kind, err)
+			failToExecuteJob(job.ID, job.Kind, err)
 
-			// TODO: Retry / Discard
+			// 不能再重试了！扔掉！
+			if job.Attempt >= MaxAttempts {
+				if markErr := w.repo.MarkDiscarded(ctx, job.ID, err); markErr != nil {
+					failToMarkJobAs("discarded", job, markErr)
+				}
+				continue
+			}
+
+			// 重试时间！
+			delay := time.Duration(1<<job.Attempt) * time.Second // 指数退避！ 2^attempt seconds
+			availableAt := time.Now().Add(delay)
+
+			if markErr := w.repo.MarkRetry(ctx, job.ID, availableAt, err); markErr != nil {
+				failToMarkJobAs("retryable", job, markErr)
+			}
 			continue
 		}
 
-		if err := w.repo.Complete(ctx, job.ID); err != nil {
-			log.Printf("worker: failed to mark job as completed (job_id=%d): %v", job.ID, err)
-			continue
+		
+		
+		// 好了完成了！！！
+		if markErr := w.repo.MarkComplete(ctx, job.ID); markErr != nil {
+			failToMarkJobAs("completed", job, markErr)
+	
 		}
+		
 
     }
+}
+
+
+
+
+
+
+func failToMarkJobAs(action string, job *Job, err error) {
+	log.Printf("worker: failed to mark job as %s (job_id=%d, kind=%q): %v",
+		action, job.ID, job.Kind, err)
+}
+
+func failToExecuteJob(jobID int64, kind string, err error) {
+	log.Printf("worker: failed to execute job (job_id=%d, kind=%q): %v",
+		jobID, kind, err)
 }
 
 

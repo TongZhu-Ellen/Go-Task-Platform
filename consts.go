@@ -9,3 +9,4 @@ const DatabaseURL = "postgres://ellenchung@127.0.0.1:5432/go_task_platform?sslmo
 // worker consts!
 const WorkerAmount = 10
 const PollInterval = time.Second
+const MaxAttempts = 3 

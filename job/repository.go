@@ -66,28 +66,35 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 	return jobp, nil
 }
 
-func (r *Repository) Complete(ctx context.Context, id int64) error {
+func (r *Repository) MarkComplete(ctx context.Context, id int64) error {
 	return r.db.WithContext(ctx).
-		Model(&Job{}). // Table("jobs")
+		Model(&Job{}).
 		Where("id = ?", id).
 		Update("state", JobCompleted).
 		Error
 }
 
-func (r *Repository) Retry(ctx context.Context, id int64, availableAt time.Time) error {
+
+func (r *Repository) MarkRetry(ctx context.Context, id int64, availableAt time.Time, lastError error) error {
 	return r.db.WithContext(ctx).
-		Model(&Job{}).
-		Where("id = ?", id).
-		Updates(map[string]interface{}{
-			"state":        JobRetryable,
-			"available_at": availableAt,
-		}).Error
+        Model(&Job{}).
+        Where("id = ?", id).
+        Updates(map[string]interface{}{
+            "state":        JobRetryable,
+            "available_at": availableAt,
+            "last_error":   lastError.Error(),
+        }).
+        Error
+
 }
 
-func (r *Repository) Discard(ctx context.Context, id int64) error {
+func (r *Repository) MarkDiscarded(ctx context.Context, id int64, lastError error) error {
 	return r.db.WithContext(ctx).
-		Model(&Job{}).
-		Where("id = ?", id).
-		Update("state", JobDiscarded).
-		Error
+        Model(&Job{}).
+        Where("id = ?", id).
+        Updates(map[string]interface{}{
+            "state":      JobDiscarded,
+            "last_error": lastError.Error(),
+        }).
+        Error
 }
