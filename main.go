@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"context"
+	"errors"
 
 	"net/http"
 
@@ -32,7 +33,17 @@ func main() {
 
 
 	// worker启动
-	w := worker.NewWorker(repository) // 现在啥也没有所以肯定找不到executor的。expected！
+	w := worker.NewWorker(repository) 
+
+	w.Register("expected-success", func(ctx context.Context, j *job.Job) error {
+    fmt.Printf("job %d executed successfully\n", j.ID)
+		return nil
+	})
+
+	w.Register("expected-failure", func(ctx context.Context, j *job.Job) error {
+		fmt.Printf("job %d execution failed\n", j.ID)
+		return errors.New("exemplary failure")
+	})
 
 	ctx := context.Background()
 	for i := 0; i < WorkerAmount; i++ {
