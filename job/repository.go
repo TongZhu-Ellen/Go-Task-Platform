@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	
 )
 
 type Repository struct {
@@ -75,7 +77,6 @@ func (r *Repository) MarkComplete(ctx context.Context, id int64) error {
 		Error
 }
 
-
 func (r *Repository) MarkRetry(ctx context.Context, id int64, availableAt time.Time, lastError error) error {
 	return r.db.WithContext(ctx).
         Model(&Job{}).
@@ -94,8 +95,36 @@ func (r *Repository) MarkDiscarded(ctx context.Context, id int64, lastError erro
         Model(&Job{}).
         Where("id = ?", id).
         Updates(map[string]interface{}{
-            "state":      JobDiscarded,
-            "last_error": lastError.Error(),
+            "state":        JobDiscarded,
+			"last_error":   lastError.Error(),
+			"available_at": nil,
         }).
         Error
+}
+
+func (r *Repository) RecoverExpiredJobs(ctx context.Context) error {
+	query := `
+		UPDATE jobs
+		SET
+			state = CASE
+				WHEN attempt >= ? THEN ?
+				ELSE ?
+			END,
+			available_at = CASE
+				WHEN attempt >= ? THEN NULL
+				ELSE NOW()
+			END
+		WHERE state = ?
+		AND last_attempt < NOW() - (? * INTERVAL '1 second')
+	`
+
+	return r.db.WithContext(ctx).Exec(
+		query,
+		MaxAttempts,
+		JobDiscarded,
+		JobRetryable,
+		MaxAttempts,
+		JobRunning,
+		JobTimeout.Seconds(),
+	).Error
 }

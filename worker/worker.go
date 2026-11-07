@@ -35,75 +35,65 @@ func (w *Worker) Get(kind string) (Executor, bool) {
 }
 
 func (w *Worker) Run(ctx context.Context, queue string) error {
-    for {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
-        if err := ctx.Err(); err != nil { // 每次开始工作前询问ctx情况，是否已经cancel！
-            return err
-        }
-
-        
-		
-		// claim job!
-		job, err := w.repo.Claim(ctx, queue)
+		// Claim job
+		j, err := w.repo.Claim(ctx, queue)
 		if err != nil {
 			log.Printf("worker: failed to claim job from queue %q: %v", queue, err)
 			time.Sleep(PollInterval)
 			continue
-		} 
-		if job == nil {
+		}
+
+		if j == nil {
 			time.Sleep(PollInterval)
 			continue
 		}
 
-		
-		// find	executor!
-		executor, ok := w.executors[job.Kind]
+		// Find executor
+		executor, ok := w.executors[j.Kind]
 		if !ok {
-			err := fmt.Errorf("executor %q not found!", job.Kind)
-			failToExecuteJob(job.ID, job.Kind, err)
+			err := fmt.Errorf("executor %q not found", j.Kind)
+			failToExecuteJob(j.ID, j.Kind, err)
 
-			if markErr := w.repo.MarkDiscarded(ctx, job.ID, err); markErr != nil {
-				failToMarkJobAs("discarded", job, markErr)
+			if markErr := w.repo.MarkDiscarded(ctx, j.ID, err); markErr != nil {
+				failToMarkJobAs("discarded", j, markErr)
 			}
 			continue
 		}
 
-
-		// execute job! 
-		err = executor(ctx, job)
+		// Execute job
+		err = executor(ctx, j)
 		if err != nil {
-			failToExecuteJob(job.ID, job.Kind, err)
+			failToExecuteJob(j.ID, j.Kind, err)
 
-			// 不能再重试了！扔掉！
-			if job.Attempt >= MaxAttempts {
-				if markErr := w.repo.MarkDiscarded(ctx, job.ID, err); markErr != nil {
-					failToMarkJobAs("discarded", job, markErr)
+			// Discard if max attempts reached
+			if j.Attempt >= job.MaxAttempts {
+				if markErr := w.repo.MarkDiscarded(ctx, j.ID, err); markErr != nil {
+					failToMarkJobAs("discarded", j, markErr)
 				}
 				continue
 			}
 
-			// 重试时间！
-			delay := time.Duration(1<<job.Attempt) * time.Second // 指数退避！ 2^attempt seconds
+			// Exponential backoff
+			delay := time.Duration(1<<j.Attempt) * time.Second
 			availableAt := time.Now().Add(delay)
 
-			if markErr := w.repo.MarkRetry(ctx, job.ID, availableAt, err); markErr != nil {
-				failToMarkJobAs("retryable", job, markErr)
+			if markErr := w.repo.MarkRetry(ctx, j.ID, availableAt, err); markErr != nil {
+				failToMarkJobAs("retryable", j, markErr)
 			}
 			continue
 		}
 
-		
-		
-		// 好了完成了！！！
-		if markErr := w.repo.MarkComplete(ctx, job.ID); markErr != nil {
-			failToMarkJobAs("completed", job, markErr)
-	
+		// Mark complete
+		if markErr := w.repo.MarkComplete(ctx, j.ID); markErr != nil {
+			failToMarkJobAs("completed", j, markErr)
 		}
-		
-
-    }
+	}
 }
-
 
 
 
