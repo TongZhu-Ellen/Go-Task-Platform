@@ -99,3 +99,90 @@ func TestClaimConcurrent(t *testing.T) {
 }
 
 
+func TestRecoverExpiredJobs(t *testing.T) {
+    db, err := gorm.Open(postgres.Open(testDBURL), &gorm.Config{})
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    repo := NewRepository(db)
+    ctx := context.Background()
+
+    lastAttempt := time.Now().Add(-2 * JobTimeout)
+    testJob := &Job{
+        Kind:        "test",
+        Queue:       "default",
+        State:       JobRunning,
+        AvailableAt: nil,
+        Attempt:     1,
+        LastAttempt: &lastAttempt,
+    }
+
+    if err := repo.create(ctx, testJob); err != nil {
+        t.Fatal(err)
+    }
+    defer db.Exec("DELETE FROM jobs WHERE id = ?", testJob.ID)
+
+    if err := repo.RecoverExpiredJobs(ctx); err != nil {
+        t.Fatal(err)
+    }
+
+    jp := &Job{}
+    if err := db.First(jp, testJob.ID).Error; err != nil {
+        t.Fatal(err)
+    }
+
+    if jp.State != JobAvailable {
+        t.Fatalf("expected state %s, got %s", JobAvailable, jp.State)
+    }
+
+    if jp.AvailableAt == nil {
+        t.Fatal("expected available_at to be set")
+    }
+
+}
+
+
+func TestRecoverExpiredJobsDiscarded(t *testing.T) {
+	db, err := gorm.Open(postgres.Open(testDBURL), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewRepository(db)
+	ctx := context.Background()
+
+	lastAttempt := time.Now().Add(-2 * JobTimeout)
+	testJob := &Job{
+		Kind:        "test",
+		Queue:       "default",
+		State:       JobRunning,
+		AvailableAt: nil,
+		Attempt:     MaxAttempts,
+		LastAttempt: &lastAttempt,
+	}
+
+	if err := repo.create(ctx, testJob); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DELETE FROM jobs WHERE id = ?", testJob.ID)
+
+	if err := repo.RecoverExpiredJobs(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	jp := &Job{}
+	if err := db.First(jp, testJob.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if jp.State != JobDiscarded {
+		t.Fatalf("expected state %s, got %s", JobDiscarded, jp.State)
+	}
+
+	if jp.AvailableAt != nil {
+		t.Fatal("expected available_at to be nil")
+	}
+}
+
+

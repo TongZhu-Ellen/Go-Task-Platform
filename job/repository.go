@@ -30,9 +30,8 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 			SELECT id
 			FROM jobs
 			WHERE queue = ?
-			AND state = 'available' 
+			AND state = 'available'
 			AND available_at <= NOW()
-	
 			ORDER BY available_at ASC, created_at ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
@@ -42,12 +41,12 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 			state = 'running',
 			attempt = attempt + 1,
 			last_attempt = NOW()
-		WHERE id = (SELECT id FROM claimed_job) -- 这里用 = 不用 IN 因为【一个】！
+		WHERE id = (SELECT id FROM claimed_job)
 		RETURNING *
 	`
-	
 
 	jobp := &Job{}
+
 	result := r.db.WithContext(ctx).Raw(query, queue).Scan(jobp)
 
 	if result.Error != nil {
@@ -56,7 +55,7 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 	if result.RowsAffected == 0 {
 		return nil, nil
 	}
-	
+
 	return jobp, nil
 }
 
@@ -94,28 +93,28 @@ func (r *Repository) MarkDiscarded(ctx context.Context, id int64, lastError erro
 }
 
 func (r *Repository) RecoverExpiredJobs(ctx context.Context) error {
-	query := `
-		UPDATE jobs
-		SET
-			state = CASE
-				WHEN attempt >= ? THEN ?
-				ELSE ?
-			END,
-			available_at = CASE
-				WHEN attempt >= ? THEN NULL
-				ELSE NOW()
-			END
-		WHERE state = ?
-		AND last_attempt < NOW() - (? * INTERVAL '1 second')
-	`
+    query := `
+        UPDATE jobs
+        SET
+            state = CASE
+                WHEN attempt >= ? THEN ?
+                ELSE ?
+            END,
+            available_at = CASE
+                WHEN attempt >= ? THEN NULL
+                ELSE NOW()
+            END
+        WHERE state = ?
+        AND last_attempt < NOW() - (? * INTERVAL '1 second')
+    `
 
-	return r.db.WithContext(ctx).Exec(
-		query,
-		MaxAttempts,
-		JobDiscarded,
-		JobAvailable,
-		MaxAttempts,
-		JobRunning,
-		JobTimeout.Seconds(),
-	).Error
+    return r.db.WithContext(ctx).Exec(
+        query,
+        MaxAttempts,
+        JobDiscarded,
+        JobAvailable,
+        MaxAttempts,
+        JobRunning,
+        JobTimeout.Seconds(),
+    ).Error
 }
