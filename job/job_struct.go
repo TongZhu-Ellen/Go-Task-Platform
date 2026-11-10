@@ -26,7 +26,6 @@ const (
 	JobAvailable JobState = "available"
 	JobRunning   JobState = "running"
 	JobCompleted JobState = "completed"
-	JobRetryable JobState = "retryable"
 	JobDiscarded JobState = "discarded"
 )
 

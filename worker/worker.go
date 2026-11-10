@@ -78,12 +78,12 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 				continue
 			}
 
-			// Exponential backoff
-			delay := time.Duration(1<<j.Attempt) * time.Second
+			
+			delay := time.Duration(j.Attempt*j.Attempt*j.Attempt*j.Attempt) * time.Second // 仿照river的进行attempt的四次方。
 			availableAt := time.Now().Add(delay)
 
-			if markErr := w.repo.MarkRetry(ctx, j.ID, availableAt, err); markErr != nil {
-				failToMarkJobAs("retryable", j, markErr)
+			if markErr := w.repo.MarkAvail(ctx, j.ID, availableAt, err); markErr != nil {
+				failToMarkJobAs("available", j, markErr)
 			}
 			continue
 		}

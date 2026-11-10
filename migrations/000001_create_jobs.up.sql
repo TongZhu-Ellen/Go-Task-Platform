@@ -12,7 +12,6 @@ CREATE TABLE jobs (
         CHECK (state IN (
             'available',
             'running',
-            'retryable',
             'completed',
             'discarded'
         )),
