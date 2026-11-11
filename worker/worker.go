@@ -59,7 +59,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 			err := fmt.Errorf("executor %q not found", j.Kind)
 			failToExecuteJob(j.ID, j.Kind, err)
 
-			if markErr := w.repo.MarkDiscarded(ctx, j.ID, err); markErr != nil {
+			if markErr := w.repo.MarkDiscarded(ctx, j.ID, j.Attempt, err) ; markErr != nil {
 				failToMarkJobAs("discarded", j, markErr)
 			}
 			continue
@@ -72,7 +72,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 
 			// Discard if max attempts reached
 			if j.Attempt >= job.MaxAttempts {
-				if markErr := w.repo.MarkDiscarded(ctx, j.ID, err); markErr != nil {
+				if markErr := w.repo.MarkDiscarded(ctx, j.ID, j.Attempt, err) ; markErr != nil {
 					failToMarkJobAs("discarded", j, markErr)
 				}
 				continue
@@ -82,7 +82,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 			delay := time.Duration(j.Attempt*j.Attempt*j.Attempt*j.Attempt) * time.Second // 仿照river的进行attempt的四次方。
 			availableAt := time.Now().Add(delay)
 
-			if markErr := w.repo.MarkAvail(ctx, j.ID, availableAt, err); markErr != nil {
+			if markErr := w.repo.MarkAvail(ctx, j.ID, j.Attempt, availableAt, err); markErr != nil {
 				failToMarkJobAs("available", j, markErr)
 			}
 			continue

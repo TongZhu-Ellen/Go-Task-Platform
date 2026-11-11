@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"time"
+	"log"
 
 	"gorm.io/gorm"
 
@@ -59,38 +60,60 @@ func (r *Repository) Claim(ctx context.Context, queue string) (*Job, error) {
 	return jobp, nil
 }
 
-func (r *Repository) MarkComplete(ctx context.Context, id int64) error {
-	return r.db.WithContext(ctx).
+func (r *Repository) MarkComplete(ctx context.Context, id int64, attempt int32) error {
+	result := r.db.WithContext(ctx).
 		Model(&Job{}).
-		Where("id = ?", id).
-		Update("state", JobCompleted).
-		Error
-}
-
-func (r *Repository) MarkAvail(ctx context.Context, id int64, availableAt time.Time, lastError error) error {
-	return r.db.WithContext(ctx).
-        Model(&Job{}).
-        Where("id = ?", id).
-        Updates(map[string]interface{}{
-            "state":        JobAvailable,
-            "available_at": availableAt,
-            "last_error":   lastError.Error(),
-        }).
-        Error
-
-}
-
-func (r *Repository) MarkDiscarded(ctx context.Context, id int64, lastError error) error {
-	return r.db.WithContext(ctx).
-        Model(&Job{}).
-        Where("id = ?", id).
-        Updates(map[string]interface{}{
-            "state":        JobDiscarded,
-			"last_error":   lastError.Error(),
+		Where("id = ? AND state = ? AND attempt = ?", id, JobRunning, attempt).
+		Updates(map[string]interface{}{
+			"state":        JobCompleted,
 			"available_at": nil,
-        }).
-        Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("repository: lease lost, skip mark complete (job_id=%d, attempt=%d)", id, attempt)
+	}
+	return nil
 }
+
+func (r *Repository) MarkAvail(ctx context.Context, id int64, attempt int32, availableAt time.Time, lastError error) error {
+	result := r.db.WithContext(ctx).
+		Model(&Job{}).
+		Where("id = ? AND state = ? AND attempt = ?", id, JobRunning, attempt).
+		Updates(map[string]interface{}{
+			"state":        JobAvailable,
+			"available_at": availableAt,
+			"last_error":   lastError.Error(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("repository: lease lost, skip mark available (job_id=%d, attempt=%d)", id, attempt)
+	}
+	return nil
+}
+
+func (r *Repository) MarkDiscarded(ctx context.Context, id int64, attempt int32, lastError error) error {
+	result := r.db.WithContext(ctx).
+		Model(&Job{}).
+		Where("id = ? AND state = ? AND attempt = ?", id, JobRunning, attempt).
+		Updates(map[string]interface{}{
+			"state":        JobDiscarded,
+			"available_at": nil,
+			"last_error":   lastError.Error(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("repository: lease lost, skip mark discarded (job_id=%d, attempt=%d)", id, attempt)
+	}
+	return nil
+}
+
+
 
 func (r *Repository) RecoverExpiredJobs(ctx context.Context) error {
     query := `

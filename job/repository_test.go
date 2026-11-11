@@ -186,3 +186,58 @@ func TestRecoverExpiredJobsDiscarded(t *testing.T) {
 }
 
 
+func TestMarkCompleteLease(t *testing.T) {
+	db, err := gorm.Open(postgres.Open(testDBURL), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewRepository(db)
+	ctx := context.Background()
+
+	// 模拟：旧 Worker 是第 1 次，任务已被恢复后由新 Worker 领取，现在是第 2 次
+	lastAttempt := time.Now()
+	testJob := &Job{
+		Kind:        "test",
+		Queue:       "default",
+		State:       JobRunning,
+		AvailableAt: nil,
+		Attempt:     2,
+		LastAttempt: &lastAttempt,
+	}
+
+	if err := repo.create(ctx, testJob); err != nil {
+		t.Fatal(err)
+	}
+	defer db.Exec("DELETE FROM jobs WHERE id = ?", testJob.ID)
+
+	// 旧 Worker（attempt=1）迟到：不应改动任何东西，也不应报错
+	if err := repo.MarkComplete(ctx, testJob.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	jp := &Job{}
+	if err := db.First(jp, testJob.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if jp.State != JobRunning {
+		t.Fatalf("stale attempt should not change state, expected %s, got %s", JobRunning, jp.State)
+	}
+
+	// 当前 Worker（attempt=2）：正常完成
+	if err := repo.MarkComplete(ctx, testJob.ID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.First(jp, testJob.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if jp.State != JobCompleted {
+		t.Fatalf("expected state %s, got %s", JobCompleted, jp.State)
+	}
+	if jp.AvailableAt != nil {
+		t.Fatal("expected available_at to be nil")
+	}
+}
+
+
