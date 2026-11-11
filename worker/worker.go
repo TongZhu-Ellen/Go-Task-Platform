@@ -89,7 +89,7 @@ func (w *Worker) Run(ctx context.Context, queue string) error {
 		}
 
 		// Mark complete
-		if markErr := w.repo.MarkComplete(ctx, j.ID); markErr != nil {
+		if markErr := w.repo.MarkComplete(ctx, j.ID, j.Attempt); markErr != nil {
 			failToMarkJobAs("completed", j, markErr)
 		}
 	}
